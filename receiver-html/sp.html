@@ -1,0 +1,124 @@
+<html>
+<head>
+<meta charset="UTF-8" />
+
+<script type="text/javascript">
+//[要変更]ここにWebsocket プロキシサーバのURLをセットします。
+var serverURL = "ws://white.cs.inf.shizuoka.ac.jp:10808/";
+//[要変更]ここにチャンネル文字列（半角英数字・ブラウザ側と同じ文字列）をセットします
+var channel = "kogurecs";
+
+window.onload = function(){
+    var X = -1;
+    var Y = -1;
+    if(channel == "" || serverURL == ""){
+        document.getElementById('messageBar').innerHTML = '[ERROR] チャンネルもしくはURLが空です。';
+        return;
+    }
+    //背景を黒に塗る
+    var ctx = document.getElementById('myCanvas').getContext('2d');
+    ctx.fillStyle = 'black';
+    ctx.strokeStyle = 'rgb(254, 254, 254)';
+    ctx.fillRect(0, 0, 678, 399);
+    
+    var webSocket = new WebSocket(serverURL);
+    webSocket.onopen = function(event){
+        document.getElementById('messageBar').innerHTML = '接続完了';
+        webSocket.send(channel + ':');
+        X = 339;
+        Y = 200;
+    };
+
+        webSocket.onmessage = function(event){
+        var msg = event.data;
+        if(msg == channel + ";"){
+            document.getElementById('messageBar').innerHTML = 'ハンドシェイク完了';
+        }else if(msg.indexOf(channel + ":") == 0){
+            //メッセージはココで受信
+            //チャンネル削除
+            msg = msg.substring(msg.indexOf(":")+1);
+            //カンマで分けて配列へ
+            var fields = msg.split(",");
+            
+            //配列最初の要素はコマンド名なので取り出します。
+            var cmd = fields.shift();
+            //コマンドに応じて処理を切り替えます。
+
+            //受信したコマンドを下部に表示
+            setCommandLabel(msg);                
+            switch(cmd){
+            case "recog":
+                //注：サーバから来たデータは文字列として扱われているため、
+                //数値を送った場合使用時はparseInt等で数値化する。
+                //recog,move,[right,left,up,down]
+                if ("move" == fields[0]){
+                    var nx;
+                    var ny;
+                    nx = X; 
+                    ny = Y;
+                    switch(fields[1]){
+                    case "right": nx = X + 50; break;
+                    case "left":  nx = X - 50; break;
+                    case "up":    ny = Y - 50; break;
+                    case "down":  ny = Y + 50; break;
+                    }
+                    if (X != nx || Y != ny){
+                        ctx.beginPath();
+                        ctx.moveTo(X, Y);
+                        ctx.lineTo(nx, ny);
+                        ctx.stroke();
+                        X = nx; Y = ny;
+                        setXLabel(X); setYLabel(Y);
+                    }
+                //recog,color,[blue,red,fuchsia,lime,aqua,yellow,white]
+                }else if ("color" == fields[0]){
+                    switch(fields[1]){
+                        case "blue": 
+                        case "red": 
+                        case "fuchsia":  // 紫
+                        case "lime":     // 緑
+                        case "aqua":     // 水色
+                        case "yellow":   // 黄色
+                        case "white":
+                            ctx.strokeStyle = fields[1];
+                            setCLabel(fields[1]);
+                    }
+                    break;
+                }
+                break;
+            }
+        }else{
+            console.log(JSON.stringify(msg));
+        }
+    };
+
+    webSocket.onclose = function(event){
+        document.getElementById('time').innerHTML = 'socket closed';
+    };
+}
+
+function setCommandLabel(a){
+    document.getElementById('CommandLabel').innerHTML = "" + a;
+}
+function setXLabel(a){
+    document.getElementById('XLabel').innerHTML = "" + a;
+}
+function setYLabel(a){
+    document.getElementById('YLabel').innerHTML = "" + a;
+}
+function setCLabel(a){
+    document.getElementById('CLabel').innerHTML = "" + a;
+}
+</script>
+</head>
+<body>
+<div style="background:black;color:white;padding:3px;" id="messageBar">&nbsp;</div>
+<div>
+COMMAND: <span id="CommandLabel"></span> / 
+X: <span id="XLabel"></span> / 
+Y: <span id="YLabel"></span> / 
+C: <span id="CLabel"></span>
+</div>
+<canvas id="myCanvas" width="678" height="399"></canvas>
+</body>
+</html>
